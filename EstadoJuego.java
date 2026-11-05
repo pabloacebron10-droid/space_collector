@@ -3,6 +3,8 @@ package clases;
 /**
  * Representa los diferentes estados de la máquina de estados del juego.
  * Permite controlar el flujo de la partida y qué pantalla debe renderizarse.
+ *
+ * @author Pablo Acebrón
  */
 public enum EstadoJuego {
     /** Pantalla inicial de bienvenida antes de comenzar a jugar */

@@ -11,6 +11,8 @@ import java.awt.RenderingHints;
  * Entidad modelo (POJO) que representa la nave del jugador.
  * Gestiona su posición, velocidad, estado de invulnerabilidad tras impactos
  * y su propio renderizado vectorial estilizado mediante Graphics2D.
+ *
+ * @author Pablo Acebrón
  */
 public class Jugador {
 

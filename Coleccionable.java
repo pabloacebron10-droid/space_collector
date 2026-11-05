@@ -13,6 +13,8 @@ import java.util.Random;
  * Entidad modelo (POJO) que representa un cristal de energía coleccionable.
  * Otorga puntos al jugador al hacer contacto. Posee una animación de flotación
  * y pulsación de brillo estelar renderizada con Graphics2D.
+ *
+ * @author Pablo Acebrón
  */
 public class Coleccionable {
 

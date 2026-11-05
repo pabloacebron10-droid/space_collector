@@ -7,6 +7,8 @@ import javax.swing.JFrame;
  * Hereda de JFrame y establece la configuración de la ventana según
  * las directrices de diseño de interfaces: tamaño fijo, centrado,
  * título descriptivo y gestión de cierre.
+ *
+ * @author Pablo Acebrón
  */
 public class VentanaJuego extends JFrame {
 

@@ -27,6 +27,8 @@ import javax.swing.Timer;
  * PanelJuego actúa como el contenedor visual y controlador del ciclo del juego.
  * Gestiona el javax.swing.Timer (bucle a ~60 FPS), la máquina de estados,
  * la actualización de física y colisiones, los Key Bindings y el renderizado con Graphics2D.
+ *
+ * @author Pablo Acebrón
  */
 public class PanelJuego extends JPanel implements ActionListener {
 

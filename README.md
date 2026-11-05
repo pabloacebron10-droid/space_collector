@@ -83,3 +83,12 @@ mvn compile
 mvn exec:java -Dexec.mainClass="clases.Main"
 ```
 O directamente ejecutando la clase `Main.java` desde tu IDE favorito (VS Code, IntelliJ IDEA, NetBeans, Eclipse).
+
+---
+
+## 👨‍💻 Autor
+
+**Pablo Acebrón**
+
+Proyecto académico de **Java Swing** para la asignatura de **Desarrollo de Interfaces**.
+

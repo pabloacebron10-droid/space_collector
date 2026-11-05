@@ -7,6 +7,8 @@ import java.util.Random;
 /**
  * Entidad de apoyo visual que representa una estrella del fondo espacial.
  * Proporciona un efecto de paralaje multicapa y titileo luminoso.
+ *
+ * @author Pablo Acebrón
  */
 public class Estrella {
 

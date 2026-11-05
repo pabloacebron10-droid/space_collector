@@ -12,6 +12,8 @@ import java.util.Random;
  * Entidad modelo (POJO) que representa un meteorito que desciende por la pantalla.
  * Puede descender de forma recta o rebotar suavemente en las paredes laterales.
  * Dispone de rotación geométrica y renderizado rocoso mediante Graphics2D.
+ *
+ * @author Pablo Acebrón
  */
 public class Obstaculo {
 
