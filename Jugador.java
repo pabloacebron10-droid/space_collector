@@ -108,6 +108,33 @@ public class Jugador {
     }
 
     /**
+     * Aplica un desplazamiento incremental directo a la posición de la nave,
+     * garantizando que permanezca siempre dentro de los márgenes visibles del juego.
+     * Utilizado para responder de forma inmediata a los clics sobre los JButtons.
+     *
+     * @param dx          Desplazamiento horizontal en píxeles
+     * @param dy          Desplazamiento vertical en píxeles
+     * @param anchoLimite Límite horizontal del panel
+     * @param altoLimite  Límite vertical del panel
+     */
+    public void desplazar(double dx, double dy, int anchoLimite, int altoLimite) {
+        this.x += dx;
+        this.y += dy;
+
+        if (this.x < 0) {
+            this.x = 0;
+        } else if (this.x > anchoLimite - ancho) {
+            this.x = anchoLimite - ancho;
+        }
+
+        if (this.y < 40) {
+            this.y = 40;
+        } else if (this.y > altoLimite - alto) {
+            this.y = altoLimite - alto;
+        }
+    }
+
+    /**
      * Activa el estado de invulnerabilidad temporal al sufrir una colisión.
      */
     public void activarInvulnerabilidad() {

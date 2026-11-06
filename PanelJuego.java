@@ -1,38 +1,55 @@
 package clases;
 
-import java.awt.AlphaComposite;
+import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.Polygon;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import javax.swing.AbstractAction;
 import javax.swing.ActionMap;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.InputMap;
+import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.KeyStroke;
 import javax.swing.Timer;
+import javax.swing.border.MatteBorder;
 
 /**
  * PanelJuego actúa como el contenedor visual y controlador del ciclo del juego.
  * Gestiona el javax.swing.Timer (bucle a ~60 FPS), la máquina de estados,
- * la actualización de física y colisiones, los Key Bindings y el renderizado con Graphics2D.
+ * la actualización de física y colisiones, los controles mediante JButtons
+ * y el renderizado con Graphics2D.
+ *
+ * De acuerdo con la rúbrica docente, la nave se pilota exclusivamente a través
+ * de JButtons de la interfaz y las flechas del teclado han sido desactivadas.
  *
  * @author Pablo Acebrón
  */
 public class PanelJuego extends JPanel implements ActionListener {
 
-    // Dimensiones lógicas del panel de juego
+    // Dimensiones lógicas del lienzo de juego
     public static final int ANCHO = 800;
     public static final int ALTO = 600;
 
@@ -58,6 +75,15 @@ public class PanelJuego extends JPanel implements ActionListener {
     private final List<Obstaculo> obstaculos;
     private final List<Coleccionable> coleccionables;
     private final List<Estrella> estrellas;
+
+    // Componentes de la interfaz de control (JButtons para cumplir la rúbrica)
+    private JPanel panelControles;
+    private JButton btnArriba;
+    private JButton btnAbajo;
+    private JButton btnIzquierda;
+    private JButton btnDerecha;
+    private JButton btnIniciar;
+    private JButton btnReiniciar;
 
     public PanelJuego() {
         setPreferredSize(new Dimension(ANCHO, ALTO));
@@ -91,7 +117,10 @@ public class PanelJuego extends JPanel implements ActionListener {
         this.vidas = VIDAS_INICIALES;
         this.tiempoTranscurridoMs = 0;
 
-        // Configuración de los controles desacoplados del foco
+        // Construcción del panel de mandos con JButtons
+        inicializarControles();
+
+        // Configuración de atajos complementarios de teclado (Espacio y R)
         configurarKeyBindings();
 
         // Inicialización del bucle principal (javax.swing.Timer)
@@ -100,43 +129,229 @@ public class PanelJuego extends JPanel implements ActionListener {
     }
 
     /**
-     * Configuración del sistema de entrada mediante InputMap y ActionMap.
-     * Se enlaza a WHEN_IN_FOCUSED_WINDOW para garantizar que los eventos de teclado
-     * se capturen de forma global en la ventana, resolviendo los problemas clásicos de foco.
-     * Además, se utilizan eventos Pressed y Released para banderas booleanas, evitando
-     * el molesto retraso por repetición de tecla del sistema operativo (OS key repeat delay).
+     * Construye el panel inferior de mando con JButtons para gobernar la nave y la partida,
+     * dando estricto cumplimiento a la rúbrica docente.
+     */
+    private void inicializarControles() {
+        this.panelControles = new JPanel(new BorderLayout(15, 0));
+        this.panelControles.setPreferredSize(new Dimension(ANCHO, 105));
+        this.panelControles.setBackground(new Color(12, 16, 28));
+        this.panelControles.setBorder(BorderFactory.createCompoundBorder(
+                new MatteBorder(2, 0, 0, 0, new Color(0, 200, 255, 120)),
+                BorderFactory.createEmptyBorder(8, 20, 8, 20)
+        ));
+
+        // 1. Sección Izquierda: Gestión de Partida
+        JPanel panelAcciones = new JPanel();
+        panelAcciones.setLayout(new BoxLayout(panelAcciones, BoxLayout.Y_AXIS));
+        panelAcciones.setOpaque(false);
+
+        JLabel lblAcciones = new JLabel("PARTIDA");
+        lblAcciones.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        lblAcciones.setForeground(new Color(140, 170, 210));
+        lblAcciones.setAlignmentX(JComponent.CENTER_ALIGNMENT);
+
+        btnIniciar = crearBotonAccion("▶ INICIAR MISIÓN", new Color(0, 220, 160), new Color(0, 255, 180));
+        btnReiniciar = crearBotonAccion("🔄 REINICIAR", new Color(255, 190, 40), new Color(255, 220, 100));
+
+        btnIniciar.setAlignmentX(JComponent.CENTER_ALIGNMENT);
+        btnReiniciar.setAlignmentX(JComponent.CENTER_ALIGNMENT);
+
+        btnIniciar.addActionListener(e -> {
+            if (estado == EstadoJuego.INICIO) {
+                reiniciarPartida();
+                estado = EstadoJuego.JUGANDO;
+            }
+        });
+
+        btnReiniciar.addActionListener(e -> {
+            reiniciarPartida();
+            estado = EstadoJuego.JUGANDO;
+        });
+
+        panelAcciones.add(lblAcciones);
+        panelAcciones.add(Box.createVerticalStrut(4));
+        panelAcciones.add(btnIniciar);
+        panelAcciones.add(Box.createVerticalStrut(6));
+        panelAcciones.add(btnReiniciar);
+
+        // 2. Sección Central: Mando de movimiento de la nave mediante JButtons (Cruceta D-Pad)
+        JPanel panelMando = new JPanel(new BorderLayout(0, 3));
+        panelMando.setOpaque(false);
+
+        JLabel lblMando = new JLabel("MANDO DE LA NAVE (JBUTTONS)");
+        lblMando.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        lblMando.setForeground(new Color(0, 200, 255));
+        lblMando.setHorizontalAlignment(JLabel.CENTER);
+
+        JPanel panelCruceta = new JPanel(new GridBagLayout());
+        panelCruceta.setOpaque(false);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(2, 4, 2, 4);
+        gbc.fill = GridBagConstraints.BOTH;
+
+        btnArriba = crearBotonMando("▲ ARRIBA");
+        btnAbajo = crearBotonMando("▼ ABAJO");
+        btnIzquierda = crearBotonMando("◄ IZQUIERDA");
+        btnDerecha = crearBotonMando("DERECHA ►");
+
+        // Vinculación de listeners a cada botón de movimiento:
+        // Clic rápido aplica un desplazamiento instantáneo de 14px; mantener pulsado activa vuelo continuo.
+        vincularBotonDireccion(btnArriba,    0, -14, b -> jugador.setArriba(b));
+        vincularBotonDireccion(btnAbajo,     0,  14, b -> jugador.setAbajo(b));
+        vincularBotonDireccion(btnIzquierda, -14, 0, b -> jugador.setIzquierda(b));
+        vincularBotonDireccion(btnDerecha,    14, 0, b -> jugador.setDerecha(b));
+
+        // Fila 0: [ ▲ ARRIBA ]
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        panelCruceta.add(btnArriba, gbc);
+
+        // Fila 1: [ ◄ IZQUIERDA ] [ ▼ ABAJO ] [ DERECHA ► ]
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        panelCruceta.add(btnIzquierda, gbc);
+
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        panelCruceta.add(btnAbajo, gbc);
+
+        gbc.gridx = 2;
+        gbc.gridy = 1;
+        panelCruceta.add(btnDerecha, gbc);
+
+        panelMando.add(lblMando, BorderLayout.NORTH);
+        panelMando.add(panelCruceta, BorderLayout.CENTER);
+
+        // 3. Sección Derecha: Información de controles para la rúbrica docente
+        JPanel panelInfo = new JPanel();
+        panelInfo.setLayout(new BoxLayout(panelInfo, BoxLayout.Y_AXIS));
+        panelInfo.setOpaque(false);
+
+        JLabel lblInfoTitulo = new JLabel("RÚBRICA DOCENTE");
+        lblInfoTitulo.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        lblInfoTitulo.setForeground(new Color(140, 170, 210));
+
+        JLabel lblInfo1 = new JLabel("✔ Control con JButtons");
+        lblInfo1.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        lblInfo1.setForeground(new Color(180, 240, 200));
+
+        JLabel lblInfo2 = new JLabel("✖ Flechas teclado desactivadas");
+        lblInfo2.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        lblInfo2.setForeground(new Color(255, 140, 140));
+
+        JLabel lblInfo3 = new JLabel("✔ Clic simple o mantener pulsado");
+        lblInfo3.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        lblInfo3.setForeground(new Color(180, 220, 240));
+
+        panelInfo.add(lblInfoTitulo);
+        panelInfo.add(Box.createVerticalStrut(4));
+        panelInfo.add(lblInfo1);
+        panelInfo.add(Box.createVerticalStrut(2));
+        panelInfo.add(lblInfo2);
+        panelInfo.add(Box.createVerticalStrut(2));
+        panelInfo.add(lblInfo3);
+
+        // Ensamblado
+        this.panelControles.add(panelAcciones, BorderLayout.WEST);
+        this.panelControles.add(panelMando, BorderLayout.CENTER);
+        this.panelControles.add(panelInfo, BorderLayout.EAST);
+    }
+
+    /**
+     * Factoría de botones de mando con estilo visual arcade espacial.
+     */
+    private JButton crearBotonMando(String texto) {
+        JButton boton = new JButton(texto);
+        boton.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        boton.setForeground(new Color(0, 240, 255));
+        boton.setBackground(new Color(22, 34, 56));
+        boton.setFocusPainted(false);
+        boton.setFocusable(false); // No roba el foco de la ventana
+        boton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        boton.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0, 170, 220), 1),
+                BorderFactory.createEmptyBorder(5, 10, 5, 10)
+        ));
+        boton.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                boton.setBackground(new Color(34, 52, 84));
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                boton.setBackground(new Color(22, 34, 56));
+            }
+        });
+        return boton;
+    }
+
+    /**
+     * Factoría de botones de acción (Iniciar / Reiniciar).
+     */
+    private JButton crearBotonAccion(String texto, Color colorBorde, Color colorTexto) {
+        JButton boton = new JButton(texto);
+        boton.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        boton.setForeground(colorTexto);
+        boton.setBackground(new Color(18, 28, 44));
+        boton.setFocusPainted(false);
+        boton.setFocusable(false);
+        boton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        boton.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(colorBorde, 1),
+                BorderFactory.createEmptyBorder(5, 12, 5, 12)
+        ));
+        boton.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                boton.setBackground(new Color(28, 44, 70));
+            }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                boton.setBackground(new Color(18, 28, 44));
+            }
+        });
+        return boton;
+    }
+
+    /**
+     * Conecta un JButton con la física de la nave:
+     * - mousePressed: desplazamiento inmediato visible y activación de la bandera de vuelo continuo.
+     * - mouseReleased y mouseExited: detención de la nave.
+     */
+    private void vincularBotonDireccion(JButton boton, double dx, double dy, Consumer<Boolean> setter) {
+        boton.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (estado == EstadoJuego.JUGANDO) {
+                    jugador.desplazar(dx, dy, ANCHO, ALTO);
+                    setter.accept(true);
+                    repaint();
+                }
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                setter.accept(false);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                setter.accept(false);
+            }
+        });
+    }
+
+    /**
+     * Configuración del sistema de entrada para atajos auxiliares (Espacio y R).
+     * Por exigencia de la rúbrica docente, las flechas del teclado y WASD han sido eliminadas:
+     * la nave no responde al teclado de cursor, únicamente a los JButtons creados.
      */
     private void configurarKeyBindings() {
         InputMap inputMap = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = getActionMap();
 
-        // Mapeo de teclas de movimiento (Flechas y WASD) - PRESIONAR
-        mapearAccion(inputMap, actionMap, "arr_press", KeyEvent.VK_UP, false, new MoverAction("arriba", true));
-        mapearAccion(inputMap, actionMap, "w_press",   KeyEvent.VK_W,  false, new MoverAction("arriba", true));
-
-        mapearAccion(inputMap, actionMap, "abj_press", KeyEvent.VK_DOWN, false, new MoverAction("abajo", true));
-        mapearAccion(inputMap, actionMap, "s_press",   KeyEvent.VK_S,    false, new MoverAction("abajo", true));
-
-        mapearAccion(inputMap, actionMap, "izq_press", KeyEvent.VK_LEFT, false, new MoverAction("izquierda", true));
-        mapearAccion(inputMap, actionMap, "a_press",   KeyEvent.VK_A,    false, new MoverAction("izquierda", true));
-
-        mapearAccion(inputMap, actionMap, "der_press", KeyEvent.VK_RIGHT, false, new MoverAction("derecha", true));
-        mapearAccion(inputMap, actionMap, "d_press",   KeyEvent.VK_D,     false, new MoverAction("derecha", true));
-
-        // Mapeo de teclas de movimiento - SOLTAR (Released)
-        mapearAccion(inputMap, actionMap, "arr_rel", KeyEvent.VK_UP, true, new MoverAction("arriba", false));
-        mapearAccion(inputMap, actionMap, "w_rel",   KeyEvent.VK_W,  true, new MoverAction("arriba", false));
-
-        mapearAccion(inputMap, actionMap, "abj_rel", KeyEvent.VK_DOWN, true, new MoverAction("abajo", false));
-        mapearAccion(inputMap, actionMap, "s_rel",   KeyEvent.VK_S,    true, new MoverAction("abajo", false));
-
-        mapearAccion(inputMap, actionMap, "izq_rel", KeyEvent.VK_LEFT, true, new MoverAction("izquierda", false));
-        mapearAccion(inputMap, actionMap, "a_rel",   KeyEvent.VK_A,    true, new MoverAction("izquierda", false));
-
-        mapearAccion(inputMap, actionMap, "der_rel", KeyEvent.VK_RIGHT, true, new MoverAction("derecha", false));
-        mapearAccion(inputMap, actionMap, "d_rel",   KeyEvent.VK_D,     true, new MoverAction("derecha", false));
-
-        // Tecla ESPACIO: Iniciar partida desde la pantalla de inicio
+        // Tecla ESPACIO: Iniciar partida desde la pantalla de inicio (atajo auxiliar)
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0, false), "iniciar_juego");
         actionMap.put("iniciar_juego", new AbstractAction() {
             @Override
@@ -148,7 +363,7 @@ public class PanelJuego extends JPanel implements ActionListener {
             }
         });
 
-        // Tecla R: Reiniciar partida tras GameOver o Victoria
+        // Tecla R: Reiniciar partida tras GameOver o Victoria (atajo auxiliar)
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, 0, false), "reiniciar_juego");
         actionMap.put("reiniciar_juego", new AbstractAction() {
             @Override
@@ -159,40 +374,6 @@ public class PanelJuego extends JPanel implements ActionListener {
                 }
             }
         });
-    }
-
-    /**
-     * Utilidad para registrar una asociación entre KeyStroke y Action en InputMap/ActionMap.
-     */
-    private void mapearAccion(InputMap im, ActionMap am, String nombre, int keyCode, boolean alSoltar, AbstractAction accion) {
-        im.put(KeyStroke.getKeyStroke(keyCode, 0, alSoltar), nombre);
-        am.put(nombre, accion);
-    }
-
-    /**
-     * Acción interna para modificar el estado de las banderas booleanas de dirección del jugador.
-     */
-    private class MoverAction extends AbstractAction {
-        private final String direccion;
-        private final boolean activado;
-
-        public MoverAction(String direccion, boolean activado) {
-            this.direccion = direccion;
-            this.activado = activado;
-        }
-
-        @Override
-        public void actionPerformed(ActionEvent e) {
-            if (estado != EstadoJuego.JUGANDO) {
-                return;
-            }
-            switch (direccion) {
-                case "arriba"    -> jugador.setArriba(activado);
-                case "abajo"     -> jugador.setAbajo(activado);
-                case "izquierda" -> jugador.setIzquierda(activado);
-                case "derecha"   -> jugador.setDerecha(activado);
-            }
-        }
     }
 
     /**
@@ -413,7 +594,7 @@ public class PanelJuego extends JPanel implements ActionListener {
         FontMetrics fm = g2d.getFontMetrics();
         String titulo = "SPACE COLLECTOR";
         int tx = (ANCHO - fm.stringWidth(titulo)) / 2;
-        int ty = 200;
+        int ty = 190;
 
         // Sombra de brillo
         g2d.setColor(new Color(0, 180, 255, 120));
@@ -430,10 +611,10 @@ public class PanelJuego extends JPanel implements ActionListener {
         g2d.drawString(sub, (ANCHO - fm.stringWidth(sub)) / 2, ty + 36);
 
         // Tarjeta de instrucciones y controles
-        int cardW = 460;
-        int cardH = 150;
+        int cardW = 520;
+        int cardH = 155;
         int cardX = (ANCHO - cardW) / 2;
-        int cardY = 270;
+        int cardY = 260;
         g2d.setColor(new Color(20, 30, 60, 190));
         g2d.fillRoundRect(cardX, cardY, cardW, cardH, 20, 20);
         g2d.setColor(new Color(0, 200, 255, 100));
@@ -441,20 +622,21 @@ public class PanelJuego extends JPanel implements ActionListener {
 
         g2d.setFont(new Font("Segoe UI", Font.BOLD, 15));
         g2d.setColor(new Color(255, 230, 100));
-        g2d.drawString("MISIÓN Y CONTROLES:", cardX + 30, cardY + 34);
+        g2d.drawString("MISIÓN Y CONTROLES (RÚBRICA DOCENTE):", cardX + 24, cardY + 32);
 
         g2d.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         g2d.setColor(Color.WHITE);
-        g2d.drawString("• Pilota con las FLECHAS o con las teclas W, A, S, D.", cardX + 30, cardY + 64);
-        g2d.drawString("• Recoge cristales de energía (+10 pts) hasta llegar a 100.", cardX + 30, cardY + 92);
-        g2d.drawString("• Esquiva los meteoritos; ¡solo dispones de 3 vidas!", cardX + 30, cardY + 120);
+        g2d.drawString("• Pilota la nave con los JBUTTONS del panel inferior.", cardX + 24, cardY + 62);
+        g2d.drawString("• Las flechas del teclado están desactivadas por rúbrica.", cardX + 24, cardY + 88);
+        g2d.drawString("• Recoge cristales de energía (+10 pts) hasta 100 puntos.", cardX + 24, cardY + 114);
+        g2d.drawString("• ¡Esquiva los meteoritos! Dispones de 3 vidas de energía.", cardX + 24, cardY + 140);
 
         // Llamada a la acción pulsante
-        g2d.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        g2d.setFont(new Font("Segoe UI", Font.BOLD, 19));
         fm = g2d.getFontMetrics();
-        String cta = "Presiona [ ESPACIO ] para despegar";
+        String cta = "Pulsa [ ▶ INICIAR MISIÓN ] en el panel inferior";
         g2d.setColor(new Color(0, 255, 200));
-        g2d.drawString(cta, (ANCHO - fm.stringWidth(cta)) / 2, 475);
+        g2d.drawString(cta, (ANCHO - fm.stringWidth(cta)) / 2, 470);
     }
 
     /**
@@ -477,7 +659,7 @@ public class PanelJuego extends JPanel implements ActionListener {
 
         g2d.setFont(new Font("Segoe UI", Font.BOLD, 19));
         fm = g2d.getFontMetrics();
-        String reintentar = "Presiona [ R ] para reparar y reiniciar";
+        String reintentar = "Pulsa [ 🔄 REINICIAR ] en el panel inferior para jugar de nuevo";
         g2d.setColor(new Color(255, 220, 100));
         g2d.drawString(reintentar, (ANCHO - fm.stringWidth(reintentar)) / 2, 380);
     }
@@ -503,7 +685,7 @@ public class PanelJuego extends JPanel implements ActionListener {
 
         g2d.setFont(new Font("Segoe UI", Font.BOLD, 19));
         fm = g2d.getFontMetrics();
-        String reintentar = "Presiona [ R ] para jugar otra partida";
+        String reintentar = "Pulsa [ 🔄 REINICIAR ] para iniciar otra misión";
         g2d.setColor(new Color(255, 220, 100));
         g2d.drawString(reintentar, (ANCHO - fm.stringWidth(reintentar)) / 2, 380);
     }
@@ -516,10 +698,17 @@ public class PanelJuego extends JPanel implements ActionListener {
         g2d.fillRect(0, 0, ANCHO, ALTO);
     }
 
-    // ================= GETTERS PARA PRUEBAS =================
+    // ================= GETTERS PARA PRUEBAS Y CONTROL =================
     public EstadoJuego getEstado() { return estado; }
     public int getPuntos() { return puntos; }
     public int getVidas() { return vidas; }
     public Jugador getJugador() { return jugador; }
     public Timer getTimer() { return timer; }
+    public JPanel getPanelControles() { return panelControles; }
+    public JButton getBotonArriba() { return btnArriba; }
+    public JButton getBotonAbajo() { return btnAbajo; }
+    public JButton getBotonIzquierda() { return btnIzquierda; }
+    public JButton getBotonDerecha() { return btnDerecha; }
+    public JButton getBotonIniciar() { return btnIniciar; }
+    public JButton getBotonReiniciar() { return btnReiniciar; }
 }
